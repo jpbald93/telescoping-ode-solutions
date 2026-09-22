@@ -1,0 +1,524 @@
+\documentclass[11pt]{article}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{xurl}
+\hypersetup{colorlinks=true,linkcolor=blue,citecolor=blue,urlcolor=blue}
+\lstset{basicstyle=\ttfamily\small,breaklines=true,frame=single,
+        showstringspaces=false,columns=flexible}
+\usepackage[htt]{hyphenat}
+\hyphenation{}
+\sloppy
+
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\C}{\mathbb{C}}
+\newcommand{\N}{\mathbb{N}}
+\newcommand{\Z}{\mathbb{Z}}
+\newcommand{\doi}[1]{\href{https://doi.org/#1}{doi:#1}}
+
+\title{\bf Telescoping Solutions of Differential Equations:\\
+A High-Order Exponential Approximation Framework}
+\author{Josh Bald\\ \small Independent Researcher\\ \small jpbald93@gmail.com}
+\date{September 2026 \quad (v3)}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We construct high-order approximations to solutions of linear ordinary
+differential equations (ODEs) by replacing the exponentials in their closed-form
+solutions with \emph{telescoping exponential approximants}
+$E_n^{(s)}(c) = (1 + c/n + s\tfrac{\sqrt3}{6}c^2 n^{-2})^{\,n + c(1/2 - s\sqrt3/6)}$,
+$s=\pm1$, whose successive differences decay as $O(n^{-4})$. We give explicit
+order-3 constructions for first-order linear ODEs $y'=ay$, the harmonic
+oscillator $y''+\omega^2 y=0$, and matrix systems $x'=Ax$; a general theorem
+showing that any constant-coefficient linear ODE whose solution is a finite
+combination of $t^j e^{\lambda t}$ inherits telescoping sequences of arbitrary
+order; and error analysis giving uniform bounds $O(n^{-(k+1)})$ on differences
+and $O(n^{-k})$ on errors over compact time intervals. The exact algebraic
+identities the framework rests on --- the vanishing of the $n^{-1}$ and $n^{-2}$
+log-series coefficients, the leading coefficient $g_3$, the finite-difference
+factor $-3$, and the Pythagorean base identity --- are kernel-checked in Lean~4
+(Appendix~\ref{app:lean}); the asymptotic statements themselves are confirmed by
+high-precision computation and are \emph{not} claimed as formalised. Every claim
+is labelled by evidence tier.
+\end{abstract}
+
+\section{Introduction}
+
+The approximation of solutions to differential equations is a central problem in
+computational mathematics. Classical numerical schemes (Runge--Kutta, linear
+multistep) deliver discrete approximations without an explicit analytical error
+structure \cite{Butcher}. Exponential integrators \cite{HochbruckOstermann,
+HochbruckLubichSelhofer} exploit the exponential structure of linear problems but
+require machinery for matrix functions \cite{AlMohyHigham,Higham2008}.
+
+A convergent sequence $(x_n)\to L$ satisfies the telescoping identity
+$L = x_1 + \sum_{n\ge1}(x_{n+1}-x_n)$, so the convergence rate is the decay rate
+of the differences $D_n = x_{n+1}-x_n$. Accelerating such convergence by
+transforming a given sequence is a classical subject with a large literature
+(surveys: \cite{Weniger,BrezinskiRZ}; standard reference \cite[\S3.9]{DLMF}).
+Rather than transform a given sequence, this note \emph{constructs} sequences
+whose differences decay quickly and lifts them from constants to functions and to
+ODE solutions.
+
+\paragraph{Distinction from symbolic ``creative telescoping.''}
+Creative telescoping \cite{Chyzak,BostanLairezSalvy} finds differential or
+difference equations satisfied by special functions --- a conceptually different
+problem. Our use of ``telescoping'' refers to the classical analytic telescoping
+of series, and to the \emph{numerical} acceleration context of
+\cite{Weniger,BrezinskiRZ}.
+
+\paragraph{Prior work.} The order-3 approximant used here as a building block was
+introduced and analysed in the author's earlier work \cite{BaldCancellation}
+(which proves the $O(n^{-4})$ telescoping decay of this family through parameter
+optimisation); the function-lifting methodology (logarithms, trigonometric
+values) is developed in \cite{BaldFunctions}. The present paper applies these to
+differential equations.
+
+\section{Preliminaries}
+
+\begin{definition}[Telescoping order]\label{def:order}
+A sequence $(x_n)$ has \emph{telescoping order $k$} if $D_n := x_{n+1}-x_n =
+O(n^{-(k+1)})$. Then the tail $R_N = \sum_{n>N}D_n = O(N^{-k})$, and in
+particular $|L - x_N| = O(N^{-k})$.
+\end{definition}
+
+\begin{definition}[Uniform telescoping]\label{def:uniform}
+A sequence of functions $(f_n)$ on an interval $I$ has \emph{uniform telescoping
+order $k$ on $I$} if $f_n\to f$ uniformly and $\sup_{t\in I}|D_n(t)| =
+O(n^{-(k+1)})$.
+\end{definition}
+
+\section{The exponential engine}
+
+We use the \emph{c-in-base} parametrisation (the base carries a factor of $c$;
+this differs from the parametrisation of \cite{BaldFunctions} and the choice is
+what makes the cancellations below work):
+
+\begin{definition}[Order-3 exponential approximant]\label{def:E}
+For $s\in\{+1,-1\}$ and $n\ge1$, set $\alpha_s(c) = s\tfrac{\sqrt3}{6}c^2$,
+$\beta_s(c) = c\bigl(\tfrac12 - s\tfrac{\sqrt3}{6}\bigr)$, and
+\[
+  E_n^{(s)}(c) = \Bigl(1 + \tfrac{c}{n} + \tfrac{\alpha_s(c)}{n^2}\Bigr)^{\,n+\beta_s(c)} .
+\]
+The base carries no factor of $c$ in the exponent; $c$ enters the base through
+$c$ and $\alpha_s$, and the exponent through $\beta_s$. For $|c|$ bounded and
+$n$ large, the base lies in a neighbourhood of $1$ avoiding $(-\infty,0]$, so the
+power is the principal branch and is analytic in $c$; the expansion below is
+uniform on compact $c$-sets for $n\ge n_0$. (Throughout, ``$\log E_n$'' denotes
+the analytic exponent $M(u)\log B(u)$ below, i.e.\ $\log E_n^{(s)}(c) =
+\bigl(u^{-1}+\beta_s(c)\bigr)\log\bigl(1+cu+\alpha_s(c)u^2\bigr)$ with $u=1/n$;
+this is the analytic logarithm of $E_n$ near $n=\infty$, not the principal
+logarithm of the complex number $E_n^{(s)}(c)$.)
+\end{definition}
+
+\begin{theorem}[Exponential telescoping engine]\label{thm:E}
+For each $c\in\C$, with $E_n^{(s)}$ as in Definition~\ref{def:E}:
+\begin{enumerate}
+\item $E_n^{(s)}(c)\to e^c$ as $n\to\infty$; \hfill\textbf{[num, classical]}
+\item $E_{n+1}^{(s)}(c)-E_n^{(s)}(c) = O(n^{-4})$; \hfill\textbf{[num]}
+\item convergence is uniform on compact subsets of $\C$; \hfill\textbf{[classical]}
+\item writing $u=1/n$, the analytic exponent has the expansion
+  \[
+    \log E_n^{(s)}(c) - c = g_3^{(s)}(c)\,n^{-3} + O(n^{-4}),
+    \qquad g_3^{(s)}(c) = \frac{c^4(-3+2s\sqrt3)}{72},
+  \]
+  with $g_4^{(s)}(c)=c^5(39-25s\sqrt3)/720$,
+  $g_5^{(s)}(c)=c^6(-18+11s\sqrt3)/270$. \hfill\textbf{[Lean] (the $g_3$ identities: $u^1,u^2$ vanish, $u^3=g_3$), [num] ($g_4,g_5$ and the asymptotics)}
+\end{enumerate}
+\end{theorem}
+
+\begin{proof}[Derivation of the cancellation]
+Write $u=1/n$, $B(u) = 1 + cu + \alpha_s u^2$, $M(u) = u^{-1}+\beta_s$, so
+$\log E_n^{(s)}(c) = M(u)\log B(u)$. Since $B(0)=1$ and
+$\log(1+z) = z - z^2/2 + z^3/3 - \cdots$,
+\[
+  \log B(u) = cu + \bigl(\alpha_s - \tfrac{c^2}{2}\bigr)u^2
+    + \bigl(\tfrac{c^3}{3} - c\alpha_s\bigr)u^3 + O(u^4).
+\]
+Multiplying by $M(u) = u^{-1}+\beta_s$ and subtracting $c$ gives coefficient
+expressions in $u$; the $u^1$ coefficient is
+\[
+  A_1 = \bigl(\alpha_s - \tfrac{c^2}{2}\bigr) + \beta_s c,
+\]
+and the $u^2$ coefficient is
+\[
+  A_2 = \bigl(\tfrac{c^3}{3} - c\alpha_s\bigr) + \beta_s\bigl(\alpha_s - \tfrac{c^2}{2}\bigr)
+      = -\tfrac{c^3}{6} + \beta_s c^2 - \beta_s^2 c .
+\]
+One checks directly that $A_1 = 0$ identically and
+$A_2 = -c^3\bigl((s\sqrt3)^2-3\bigr)/36 = 0$ when $(s\sqrt3)^2=3$; the $u^3$
+coefficient is then
+$A_3 = \bigl(-\tfrac{\alpha_s^2}{2} + c^2\alpha_s - \tfrac{c^4}{4}\bigr)
++ \beta_s\bigl(\tfrac{c^3}{3} - c\alpha_s\bigr) = g_3^{(s)}(c)$.
+These three polynomial identities are kernel-checked
+(Appendix~\ref{app:lean}, \texttt{u1\_coeff\_zero}, \texttt{u2\_coeff\_zero},
+\texttt{u3\_coeff\_eq\_g3}); the identification of $A_1,A_2,A_3$ as the
+$u^1,u^2,u^3$ coefficients uses the classical logarithm series. Uniformity on
+compact $c$-sets is standard; convergence to $e^c$ and the $O(n^{-4})$ rate then
+follow from $E_n^{(s)}(c) = e^c\bigl(1 + g_3^{(s)} n^{-3} + O(n^{-4})\bigr)$ and
+the finite-difference factor below.
+\end{proof}
+
+\begin{lemma}[Finite-difference factor]\label{lem:fd}
+For a term behaving as $u^3 = n^{-3}$, the successive difference carries the
+factor $-3$: exactly, $\bigl(\tfrac{u}{1+u}\bigr)^3 - u^3 =
+(-3u^4-3u^5-u^6)/(1+u)^3$, whose leading coefficient is $-3u^4$. Hence
+\[
+  E_{n+1}^{(s)}(c) - E_n^{(s)}(c) = -3\,g_3^{(s)}(c)\,e^c\,n^{-4} + O(n^{-5})
+    = \frac{c^4(3-2s\sqrt3)}{24}\,e^c\,n^{-4} + O(n^{-5}).
+\]
+\end{lemma}
+\begin{proof}
+The rational identity and the coefficient $-3$ are kernel-checked
+(Appendix~\ref{app:lean}, \texttt{diff\_cube\_factor}); the leading-constant
+identification $-3g_3^{(s)} = c^4(3-2s\sqrt3)/24$ is \texttt{lead\_eq}. The
+$O(n^{-5})$ remainder uses that $\log E_n^{(s)} - c$ is real-analytic in $u$ at
+$0$ (the base is smooth and positive near $u=0$), so the expansion is a
+convergent power series whose $O(u^5)$ truncation error has an $O(u^5)$
+successive difference.
+\end{proof}
+
+\begin{remark}[$O(\cdot)$ is a bound, not a sharp law]\label{rem:sharp}
+The estimates $N=O(\varepsilon^{-1/3})$ follow from $R_N=O(N^{-3})$ as an upper
+bound and become a sharp power law only when the leading constant is nonzero. At
+degenerate parameters (e.g.\ $c=0$) the effective order is higher.
+\end{remark}
+
+\section{First-order linear ODEs}
+
+Consider $y'=ay$, $y(0)=y_0$, with exact solution $y(t)=y_0e^{at}$. Define
+$y_n(t) := y_0 E_n^{(s)}(at)$.
+
+\begin{theorem}[First-order convergence]\label{thm:first}
+For any compact interval $I\subset\R$:
+$\sup_{t\in I}|y_n(t)-y(t)| = O(n^{-3})$ and
+$\sup_{t\in I}|y_{n+1}(t)-y_n(t)| = O(n^{-4})$.
+\hfill\textbf{[num, classical]}
+\end{theorem}
+
+\begin{corollary}[Asymptotic constants]\label{cor:const}
+Write $\tilde A_3(c) := g_3^{(s)}(c) = c^4(-3+2s\sqrt3)/72$, so that
+$E_n^{(s)}(c) - e^c = e^c\bigl(\tilde A_3(c)\,n^{-3} + O(n^{-4})\bigr)$: the
+coefficient of $n^{-3}$ in the \emph{normalised} error
+$e^{-c}(E_n^{(s)}(c)-e^c)$ is $\tilde A_3$, and in the actual error it is
+$e^c\tilde A_3(c)$. Then for each compact $I=[-T,T]$ there is
+$n_0=n_0(a,T)$ and a constant $C_1$ such that, for all $n\ge n_0$,
+\[
+  \sup_{t\in I}|y(t)-y_n(t)|\le C_1\,n^{-3},
+  \qquad
+  \sup_{t\in I}|y_{n+1}(t)-y_n(t)|\le 3C_1\,n^{-4},
+\]
+where one may take $C_1 = |y_0|\,e^{|a|T}\bigl(\sup_{c\in[-|a|T,|a|T]}|\tilde A_3(c)| + 1\bigr)$.
+\end{corollary}
+\begin{proof}
+The factor $3$ in the second bound is Lemma~\ref{lem:fd}; the $e^{|a|T}$ factor
+absorbs the $e^c$ normalisation. These are \emph{asymptotic} bounds: they hold
+for $n\ge n_0$, and the ``$+1$'' absorbs the $O(n^{-4})$ tail so that no
+unproven finite-$n$ inequality is asserted. (Leading coefficients alone do not
+give an exact global constant; the statement is deliberately an inequality valid
+for large $n$.)
+\end{proof}
+
+\begin{remark}[Complexity, stated honestly]\label{rem:complexity}
+To reach accuracy $\varepsilon$ one needs $n = O(\varepsilon^{-1/3})$ terms. This
+exponent is \emph{smaller} than the $\varepsilon^{-1/2}$ of a method whose error
+decays as $O(N^{-2})$ \cite{Weniger,BrezinskiRZ}, but term count is not a work
+model: evaluating $E_n^{(s)}(at)$ is a single non-integer power, and against
+analytic targets on bounded intervals spectral methods converge at $O(e^{-cN})$.
+We therefore claim no demonstrated net-work advantage; the appeal of the
+construction is its explicit closed form and error structure.
+\end{remark}
+
+\section{Harmonic oscillator}
+
+For $y''+\omega^2y=0$ with $y(0)=y_0$, $y'(0)=v_0$, define
+$C_n^{(s)}(x) := \Re E_n^{(s)}(ix)$ and $S_n^{(s)}(x) := \Im E_n^{(s)}(ix)$,
+and $y_n(t) = y_0C_n^{(s)}(\omega t) + (v_0/\omega)S_n^{(s)}(\omega t)$.
+
+\begin{theorem}[Trigonometric properties]\label{thm:trig}
+$C_n^{(s)}\to\cos$, $S_n^{(s)}\to\sin$ uniformly on compacts;
+$|C_{n+1}^{(s)}-C_n^{(s)}| = O(n^{-4})$ and likewise for $S$; and the
+Pythagorean identity holds approximately:
+$(C_n^{(s)})^2 + (S_n^{(s)})^2 = 1 + O(n^{-3})$.
+\hfill\textbf{[num, classical]; base identity [Lean]}
+\end{theorem}
+\begin{proof}[Pythagorean identity]
+Since $(C_n^{(s)})^2 + (S_n^{(s)})^2 = |E_n^{(s)}(ix)|^2$ and
+$|E_n^{(s)}(ix)|^2 = \exp\bigl(2\,\Re\log E_n^{(s)}(ix)\bigr)$,
+\begin{align*}
+  |E_n^{(s)}(ix)|^2
+    &= \exp\bigl(2\,\Re\,(ix + g_3^{(s)}(ix)n^{-3} + O(n^{-4}))\bigr) \\
+    &= \exp\bigl(2\,\Re g_3^{(s)}(ix)\,n^{-3} + O(n^{-4})\bigr)
+     = 1 + 2\,\Re g_3^{(s)}(ix)\,n^{-3} + O(n^{-4}),
+\end{align*}
+using Theorem~\ref{thm:E}(4). (This route avoids any claim that a complex power
+contributes a modulus-$1$ factor.) The polynomial base identity
+$|B_n^{(s)}(x)|^2 = 1 + x^2(1 - s\sqrt3/3)u^2 + (x^4/12)u^4$ is
+kernel-checked (Appendix~\ref{app:lean}, \texttt{pyth\_expand}); it is consistent
+with the result but is not needed for it.
+\end{proof}
+
+\begin{lemma}[Derivative cancellation]\label{lem:deriv}
+$\dfrac{\partial}{\partial c}\log E_n^{(s)}(c) = 1 + O(n^{-3})$ uniformly on
+compact $c$-sets. Consequently
+$\frac{d}{dt}E_n^{(s)}(\omega t) = \omega e^{\omega t} + O(n^{-3})$.
+\hfill\textbf{[Lean] (the $u^1$ vanishing), [classical] (the $u^2$ vanishing, by differentiating the formalised $A_2$ identity), [num] (the $O(n^{-3})$)}
+\end{lemma}
+\begin{proof}
+Differentiating $M(u)\log B(u)$ in $c$, the $u^0$ coefficient is $1$ and both the
+$u^1$ and $u^2$ coefficients vanish: the $u^1$ coefficient is
+$2b_s + s\sqrt3/3 - 1$ with $b_s := 1/2 - s\sqrt3/6$, which is $0$ for both
+branches (kernel-checked, \texttt{deriv\_u1\_plus/minus}), and the $u^2$
+coefficient vanishes as well (it is the $c$-derivative of the $A_2$ polynomial
+identity, classical). \emph{Thus differentiation preserves the $n^{-3}$
+order} (the error is analytic in $c$ and $u$, so analytic differentiation on a
+compact set interior preserves the order). The derivative is therefore
+$1+O(n^{-3})$, not merely $1+O(n^{-2})$.
+\end{proof}
+
+\begin{proposition}[Energy conservation]\label{prop:energy}
+With $E(t)=\tfrac12(y')^2+\tfrac12\omega^2y^2$ and $E_n(t)$ its telescoping
+analogue, $|E_n(t)-E(0)| = O(n^{-3})$. \hfill\textbf{[num]}
+\end{proposition}
+\begin{proof}
+The derivative error is $O(n^{-3})$ (Lemma~\ref{lem:deriv}) and the Pythagorean
+error is $O(n^{-3})$ (Theorem~\ref{thm:trig}); both contribute at that order.
+\end{proof}
+
+\section{Matrix differential equations}
+
+For $x'=Ax$, $x(0)=x_0$, with $A\in\R^{d\times d}$, put $X=At$ and define
+\[
+  M_n^{(s)}(t) = \bigl(I + \tfrac{X}{n} + s\tfrac{\sqrt3}{6}X^2n^{-2}\bigr)^{\,nI + b_s X},
+  \qquad b_s = \tfrac12 - s\tfrac{\sqrt3}{6},
+\]
+the matrix power via $X^Y=\exp(Y\log X)$ (principal logarithm of the base).
+
+\begin{lemma}[Commutativity]\label{lem:comm}
+$B_n^{(s)}(t) := I + \tfrac{X}{n} + s\tfrac{\sqrt3}{6}X^2n^{-2}$ is a polynomial
+in $X$, hence commutes with $X$, with its (locally analytic) logarithm, and with
+the exponent $nI + b_sX$. \hfill\textbf{[classical]}
+\end{lemma}
+
+\begin{theorem}[Matrix convergence]\label{thm:matrix}
+For any $A\in\R^{d\times d}$ and compact $I\subset\R$, for $n\ge n_0(A,I)$:
+$M_n^{(s)}(t)\to e^{X}$ in operator norm,
+$\|M_{n+1}^{(s)}-M_n^{(s)}\|_{\mathrm{op}} = O(n^{-4})$, and
+$\|e^{X}-M_n^{(s)}\|_{\mathrm{op}} = O(n^{-3})$, uniformly on $I$.
+\hfill\textbf{[num]}
+\end{theorem}
+\begin{proof}
+\emph{This is the step the first draft asserted; here it is proved.} Let
+$X=At$ and define the \emph{analytic} logarithm
+\[
+  H_n = \bigl(nI + b_sX\bigr)\operatorname{Log}\bigl(I + \tfrac{X}{n} + s\tfrac{\sqrt3}{6}X^2n^{-2}\bigr),
+\]
+so that $M_n^{(s)}(t) = \exp(H_n)$ by definition. By Lemma~\ref{lem:comm} every
+object in sight is a power series in the single matrix $X$, and these all
+commute. Hence $H_n$ is the \emph{scalar} function $M(u)\log B(u)$ of Section~3
+evaluated at the commuting operator $X$ (with $c$ replaced by $X$): on a common
+eigenbasis, or block-by-block on a Jordan form, the $u^1$ and $u^2$ cancellations
+of Theorem~\ref{thm:E} hold, giving
+\[
+  H_n = X + G_3(X)\,n^{-3} + O(n^{-4}), \qquad
+  G_3(X) = \tfrac{-3+2s\sqrt3}{72}X^4,
+\]
+in operator norm, uniformly for $t\in I$. Because $[X,H_n-X]=0$,
+$M_n = e^{X}\exp(H_n - X) = e^{X} + e^{X}G_3(X)n^{-3} + O(n^{-4})$, so
+$\|e^{X}-M_n^{(s)}\|_{\mathrm{op}} = O(n^{-3})$; and
+$M_{n+1}-M_n = -3\,e^{X}G_3(X)n^{-4} + O(n^{-5}) = O(n^{-4})$ by
+Lemma~\ref{lem:fd}. The reduction is exact because the coefficient identities
+are polynomial identities in the commuting matrix $X$; no commutator (Baker--Campbell--Hausdorff)
+terms arise. Note ``$\log M_n$'' means $H_n$, the analytic logarithm, not
+necessarily the principal logarithm of the matrix $M_n=\exp H_n$ (these differ by
+$2\pi i$ multiples when eigenvalues leave the principal strip).
+\end{proof}
+
+\begin{remark}
+Verified numerically at 80-digit precision on a \emph{non-normal} $3\times3$
+matrix (driver, Part~3; $\|A^TA-AA^T\|_2\approx1.285$):
+$n^3\|M_n-e^{X}\|_{\mathrm{op}} \to 0.0011759\ldots$ (a stable constant,
+confirming $O(n^{-3})$) and $n^4\|M_{n+1}-M_n\|_{\mathrm{op}} \to 0.0035277\ldots$.
+\end{remark}
+
+\begin{theorem}[Stability on compact time intervals]\label{thm:stab}
+If all eigenvalues of $A$ satisfy $\Re\lambda_i\le-\gamma<0$ and $A$ is
+diagonalisable with $A=PDP^{-1}$, then for $n\ge n_0(A,T,\gamma)$,
+$\|M_n^{(s)}(t)\|_{\mathrm{op}}\le C(A)e^{-\gamma t}$ on $[0,T]$ with
+$C(A)=2\|P\|\,\|P^{-1}\|$. \hfill\textbf{[num]}
+\end{theorem}
+\begin{remark}
+We do \emph{not} claim uniform-in-time $A$-stability; the bound is on a compact
+interval with $n$ chosen for it. For non-diagonalisable $A$ the result extends via
+Jordan form with polynomial factors absorbed into $C(A)$ (the same
+commuting-operator argument as Theorem~\ref{thm:matrix}).
+\end{remark}
+
+\section{General engine}
+
+\begin{definition}[Exponential-algebraic class $\mathcal G$]\label{def:G}
+$\mathcal G$ is the smallest class containing all $e^{\lambda t}$ ($\lambda\in\C$)
+and all polynomials $t^k$, closed under addition, multiplication, scalar
+multiplication, and differentiation. It is exactly the finite combinations
+$\sum c_{j,\lambda}t^j e^{\lambda t}$, i.e.\ the solution class of every
+constant-coefficient linear ODE \cite{CoddingtonLevinson}.
+\end{definition}
+
+\begin{theorem}[ODE telescoping engine]\label{thm:engine}
+Let $L[y]=\sum_{i=0}^m a_iy^{(i)}$ have constant coefficients, and let $y$ solve
+$L[y]=0$ with prescribed initial data. If $y\in\mathcal G$ then there is a
+telescoping approximant $y_n$ with $y_n\to y$ uniformly on compacts,
+$|y_{n+1}-y_n| = O(n^{-(k+1)})$, and $|y-y_n| = O(n^{-k})$, where $k$ is the
+telescoping order of the underlying exponential approximants (here $k=3$).
+\hfill\textbf{[num, classical]}
+\end{theorem}
+\begin{proof}
+By the characteristic-polynomial structure,
+$y(t)=\sum_{i}\sum_{j<m_i}c_{i,j}t^je^{\lambda_it}$ \cite{CoddingtonLevinson}.
+Define $y_n(t)=\sum_{i,j}c_{i,j}t^jE_n^{(s)}(\lambda_it)$, keeping the
+polynomial factor $t^j$ \emph{exact} and approximating only $e^{\lambda_it}$. Each
+term converges with the required rate (Theorem~\ref{thm:E}); the finite sum
+preserves it by the triangle inequality. The telescoping difference bound follows
+the same way term-by-term.
+\end{proof}
+
+\begin{remark}[Differentiation and order]
+For this analytic family, differentiation \emph{preserves} the telescoping order:
+Lemma~\ref{lem:deriv} shows $\partial_c\log E_n^{(s)} = 1 + O(n^{-3})$ (both the
+$u^1$ and $u^2$ coefficients vanish), so the derivative is accurate to
+$O(n^{-3})$, the same order as the function. The engine's conclusions are about
+the undifferentiated solution $y_n$; the closure of $\mathcal G$ under
+differentiation holds at the same rate here, by analytic differentiation on the
+interior of a compact set.
+\end{remark}
+
+\section{Discussion}
+
+The framework's appeal is analytical transparency: closed-form approximants with
+explicit error structure, at a polynomial rate $N=O(\varepsilon^{-1/3})$ that is
+slower than exponential-integrator or spectral methods
+\cite{HochbruckOstermann,TrefethenBau}. We make no net-cost claim. Natural
+extensions --- higher-order kernels with $O(n^{-6})$ differences, hybrid schemes
+with modern exponential integrators \cite{ChenBorzi,QiDengZhu,AlMohyPhi,AlMohyLiu},
+and stiff neural-ODE contexts \cite{FronkPetzoldChaos,FronkPetzoldArxiv} --- are
+left open.
+
+\section*{Declarations}
+
+\paragraph{Use of AI.} The author acknowledges the use of a large-language-model
+assistant (Grok~4, xAI, December 2025) in developing an earlier draft: expanding
+and reorganising the author's mathematical notes, drafting prose, and assisting
+literature search. \emph{All mathematical content, proofs, and computations are
+the author's.} The present revision (the corrected matrix proof, the
+differentiation/energy corrections, the reference corrections, and the Lean
+development) was also prepared with large-language-model assistance under the
+author's direction. A known risk of AI-assisted reference finding is imperfect
+bibliographic metadata; all references were therefore checked against
+Crossref/arXiv/DataCite, and three author-name or institution errors in the
+earlier draft were corrected.
+
+\paragraph{Evidence tiers.} Claims are labelled \textbf{[Lean]}
+(kernel-checked in Appendix~\ref{app:lean}), \textbf{[num]} (confirmed by
+high-precision computation, not proved), and \textbf{[classical]} (standard
+facts). The asymptotic statements are \emph{not} formalised.
+
+\section*{Appendix A: Reproduction}
+The program \texttt{code/verify\_ode.py} regenerates every numeral here
+(symbolic derivation of $g_1..g_5$; the derivative cancellation; the Pythagorean
+base; the leading difference constant by a Neville tableau; the high-precision
+non-normal matrix check; the derivative-order check). Appendix~\ref{app:lean}
+ships the Lean development.
+
+\section*{Appendix B: Lean development}
+\label{app:lean}
+The exact algebra is kernel-checked in Lean~4 (Mathlib), in twelve audited
+theorems. These include: the log-series coefficient identities
+\texttt{u1\_coeff\_zero} ($A_1=0$), \texttt{u2\_coeff\_zero} ($A_2=0$ given
+$(s\sqrt3)^2=3$), and \texttt{u3\_coeff\_eq\_g3} ($A_3=g_3$); the
+finite-difference factor $-3$ (\texttt{diff\_cube\_factor}); the
+leading-constant identity $-3g_3^{(s)} = c^4(3-2s\sqrt3)/24$ (\texttt{lead\_eq})
+and positivity of the $s=-1$ branch constant (\texttt{leadMinus\_pos}); the
+derivative-cancellation vanishings (\texttt{deriv\_u1\_plus/minus}); and the
+Pythagorean base identity (\texttt{pyth\_expand}). The gate \texttt{lean/gate.sh}
+requires a clean build, no \texttt{sorry}/\texttt{admit}/\texttt{axiom}/
+\texttt{native\_decide}, only the three standard axioms (\texttt{propext},
+\texttt{Classical.choice}, \texttt{Quot.sound}), and a minimum count of audited
+theorems; it prints \texttt{PASS (12 theorems, standard axioms only)}. The
+asymptotics ($O(n^{-3})$, $O(n^{-4})$, uniform convergence) are \emph{not}
+formalised and are tiered \textbf{[num]}.
+
+\begin{thebibliography}{9}
+\bibitem{AlMohyHigham} A.~H. Al-Mohy and N.~J. Higham, \emph{Computing the action
+of the matrix exponential, with an application to exponential integrators},
+SIAM J.\ Sci.\ Comput.\ \textbf{33} (2011), 488--511. \doi{10.1137/100788860}
+\bibitem{AlMohyLiu} A.~H. Al-Mohy and X.~Liu, \emph{Computing matrix
+$\varphi$-functions arising in exponential integrators}, arXiv:2506.01193
+(2025). \doi{10.48550/arXiv.2506.01193}
+\bibitem{AlMohyPhi} A.~H. Al-Mohy, \emph{Computing linear combinations of
+$\varphi$-function actions for exponential integrators}, arXiv:2509.26475
+(2025). \doi{10.48550/arXiv.2509.26475}
+\bibitem{BaldCancellation} J.~Bald, \emph{Higher-order cancellation in
+exponential approximants: an explicit $O(n^{-4})$ telescoping family}, Zenodo
+(2025). \doi{10.5281/zenodo.18098327}
+\bibitem{BaldFunctions} J.~Bald, \emph{High-order telescoping sequences for
+function approximation: a framework using optimized exponential approximants},
+Zenodo (2026). \doi{10.5281/zenodo.18216349}
+\bibitem{BostanLairezSalvy} A.~Bostan, P.~Lairez, and B.~Salvy, \emph{Creative
+telescoping for rational functions using the Griffiths--Dwork method}, ISSAC
+(2013), 93--100. \doi{10.1145/2465506.2465935}
+\bibitem{BrezinskiRZ} C.~Brezinski and M.~Redivo-Zaglia, \emph{Extrapolation and
+Rational Approximation: The Works of the Main Contributors}, Springer, Cham
+(2020). \doi{10.1007/978-3-030-58418-4}
+\bibitem{Butcher} J.~C. Butcher, \emph{Numerical Methods for Ordinary
+Differential Equations}, 3rd ed., Wiley (2016). \doi{10.1002/9781119121534}
+\bibitem{ChenBorzi} H.~Chen and A.~Borz\`i, \emph{Low-rank exponential
+integrators for stiff differential Riccati equations}, Adv.\ Comput.\ Math.\
+\textbf{51} (2025), art.\ 17. \doi{10.1007/s10444-025-10228-w}
+\bibitem{Chyzak} F.~Chyzak, \emph{The ABC of Creative Telescoping --- Algorithms,
+Bounds, Complexity}, habilitation thesis, Universit\'e Paris-Sud~11 (2014).
+\bibitem{CoddingtonLevinson} E.~A. Coddington and N.~Levinson, \emph{Theory of
+Ordinary Differential Equations}, McGraw-Hill (1955).
+\bibitem{DLMF} NIST Digital Library of Mathematical Functions, \S3.9
+(Acceleration of Convergence), \url{https://dlmf.nist.gov/3.9}.
+\bibitem{FronkPetzoldChaos} C.~Fronk and L.~R. Petzold, \emph{Training stiff
+neural ordinary differential equations with explicit exponential integration
+methods}, Chaos \textbf{35} (2025), art.\ 033154. \doi{10.1063/5.0251475}
+\bibitem{FronkPetzoldArxiv} C.~Fronk and L.~R. Petzold, \emph{Performance
+evaluation of single-step explicit exponential integration methods on stiff
+ordinary differential equations}, arXiv:2411.19374 (2024).
+\doi{10.48550/arXiv.2411.19374}
+\bibitem{HochbruckLubichSelhofer} M.~Hochbruck, C.~Lubich, and H.~Selhofer,
+\emph{Exponential integrators for large systems of differential equations}, SIAM
+J.\ Sci.\ Comput.\ \textbf{19} (1998), 1552--1574. \doi{10.1137/S1064827595295337}
+\bibitem{HochbruckOstermann} M.~Hochbruck and A.~Ostermann, \emph{Exponential
+integrators}, Acta Numer.\ \textbf{19} (2010), 209--286.
+\doi{10.1017/S0962492910000048}
+\bibitem{Higham2008} N.~J. Higham, \emph{Functions of Matrices: Theory and
+Computation}, SIAM (2008). \doi{10.1137/1.9780898717778}
+\bibitem{QiDengZhu} Z.~Qi, W.~Deng, and F.~Zhu, \emph{Error analysis on a novel
+class of exponential integrators with local linear extension techniques for
+highly oscillatory ODEs}, arXiv:2511.15104 (2025).
+\doi{10.48550/arXiv.2511.15104}
+\bibitem{TrefethenBau} L.~N. Trefethen and D.~Bau III, \emph{Numerical Linear
+Algebra}, SIAM (1997). \doi{10.1137/1.9780898719574}
+\bibitem{Weniger} E.~J. Weniger, \emph{Nonlinear sequence transformations for
+the acceleration of convergence and the summation of divergent series}, Comput.\
+Phys.\ Rep.\ \textbf{10} (1989), 189--371. \doi{10.1016/0167-7977(89)90011-7}
+\end{thebibliography}
+
+\end{document}

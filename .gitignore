@@ -1,0 +1,14 @@
+# Lean build artifacts (source-only repo; regenerate with lake exe cache get + lake build)
+lean/.lake/
+**/*.olean
+**/*.ilean
+**/*.trace
+# LaTeX aux
+paper/*.aux
+paper/*.log
+paper/*.out
+paper/*.toc
+paper/*.synctex.gz
+# Python
+**/__pycache__/
+**/*.pyc

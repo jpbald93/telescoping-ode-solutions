@@ -1,0 +1,59 @@
+precision = 80 digits
+
+=== PART 1a: coefficients of log E_n - c (paper's c-in-base engine) ===
+  branch (+):
+    u^1: 0
+    u^2: 0
+    u^3: c**4*(-3 + 2*sqrt(3))/72
+    u^4: c**5*(39 - 25*sqrt(3))/720
+    u^5: c**6*(-18 + 11*sqrt(3))/270
+  branch (-):
+    u^1: 0
+    u^2: 0
+    u^3: c**4*(-2*sqrt(3) - 3)/72
+    u^4: c**5*(39 + 25*sqrt(3))/720
+    u^5: c**6*(-11*sqrt(3) - 18)/270
+  -> u^1 = u^2 = 0 (order 3); g3 = c^4(-3 + 2s sqrt3)/72.
+
+=== PART 1b: derivative cancellation d/dc log E_n = 1 + O(n^-3) ===
+    (+): u^0 = 1, u^1 = 0, u^2 = 0
+    (-): u^0 = 1, u^1 = 0, u^2 = 0
+  -> u^0 = 1, u^1 = 0, u^2 = 0: BOTH lower terms vanish, so the derivative
+     preserves the n^-3 order (NOT an order drop).
+
+=== PART 1c: Pythagorean base |B_n(ix)|^2 (exact polynomial in u) ===
+    (+): |B_n|^2 = u**4*x**4/12 - sqrt(3)*u**2*x**2/3 + u**2*x**2 + 1
+    (-): |B_n|^2 = u**4*x**4/12 + sqrt(3)*u**2*x**2/3 + u**2*x**2 + 1
+  -> = 1 + x^2 u^2 (1 - s sqrt3/3) + (x^4/12) u^4.
+
+=== PART 2: leading difference constant lim n^4 D_n (Neville) ===
+    target = c^4(3 -/+ 2 sqrt3)/24 * e^c = -3 g3 e^c
+
+     c br           extrapolated n^4 D_n                    closed form    rel.err
+   1.0  +     -0.05256495779114381857779     -0.05256495779114381857779   8.09e-26
+   1.0  -       0.7321354149059051274179       0.7321354149059051274179    2.8e-25
+   2.0  +       -2.286181913238127276728       -2.286181913238127276728   3.58e-25
+   2.0  -        31.84240630896072818565        31.84240630896072818565   3.52e-24
+   0.5  +    -0.001992641157926824404878    -0.001992641157926824404878   3.28e-26
+   0.5  -      0.02775391101261632669939      0.02775391101261632669939   5.88e-26
+  -1.0  +    -0.007113893450985039743183    -0.007113893450985039743183    1.2e-27
+  -1.0  -      0.09908375374384562014206      0.09908375374384562014206   3.45e-27
+
+=== PART 3: matrix engine on a NON-NORMAL A (high precision, 80 dps) ===
+    A = [[.3,1,.2],[0,-.5,.7],[.1,0,.4]], t=0.8, ||A^T A - A A^T||_2 = 1.285485238
+        n      n^3||M_n-e^At||     n^4||M_{n+1}-M_n||
+       50   0.0011654988329444      0.003351619429924
+      100   0.0011706813055467     0.0034379586055824
+      200   0.0011732861759866     0.0034823931861286
+      400   0.0011745920357678     0.0035049363516557
+    -> both columns converge to nonzero constants: O(n^-3) error, O(n^-4)
+       differences. The n^-2 cancellation survives (everything commutes).
+
+=== PART 4: derivative-order check, d/dt E_n(wt) vs w e^{wt} (order preserved) ===
+    (an earlier draft wrongly claimed the derivative is only O(n^-2))
+         n    |d/dt E_n - w e^wt|          * n^3
+       200         1.823809547e-9  0.01459047638
+      1000        1.463642762e-11  0.01463642762
+      5000        1.171651325e-13  0.01464564156
+    -> n^3 * error -> nonzero constant: the derivative is O(n^-3), i.e. the
+       order is PRESERVED under differentiation for this analytic family.
